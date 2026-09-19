@@ -38,8 +38,8 @@ right answer, so a bad result points at the integration rather than the model.
 | --- | --- |
 | `docs/setup-findings.md` | Verified API/SDK shapes and two corrections to the brief |
 | `src/` | Shared client code and the connection check |
-| `manual_test/` | `chat.py` — terminal chat loop; ask a yes/no question, get a yes/no |
-| `experiments/` | One directory per experiment: state, questions, results, notes |
+| `manual_test/` | `chat.py` — yes/no chat loop; `tool_caller.py` — tool calls as JSON |
+| `experiments/` | One directory per experiment. `01-tool-calling/` is the first |
 
 ## Sources
 
