@@ -36,10 +36,13 @@ right answer, so a bad result points at the integration rather than the model.
 
 | Path | What it holds |
 | --- | --- |
-| `docs/setup-findings.md` | Verified API/SDK shapes and two corrections to the brief |
+| `PHASE-1-INITIAL-TESTING.md` | **Start here** — the phase 1 write-up, all three experiments |
+| `docs/setup-findings.md` | Verified API/SDK shapes and two naming corrections |
 | `src/` | Shared client code and the connection check |
 | `manual_test/` | `chat.py` — yes/no chat loop; `tool_caller.py` — tool calls as JSON |
-| `experiments/` | One directory per experiment. `01-tool-calling/` is the first |
+| `experiments/01-tool-calling/` | Can Jev replace the tool-calling step of an LLM |
+| `experiments/02-jev-vs-local-llm/` | The same task against local Qwen3.5 4B and 2B |
+| `experiments/03-memory-lookup-decision/` | Can a cheap judgement decide when to skip retrieval |
 
 ## Sources
 
