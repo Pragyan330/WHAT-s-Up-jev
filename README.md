@@ -38,7 +38,7 @@ right answer, so a bad result points at the integration rather than the model.
 | --- | --- |
 | `docs/setup-findings.md` | Verified API/SDK shapes and two corrections to the brief |
 | `src/` | Shared client code and the connection check |
-| `manual_test/` | `main.py` — interactive harness for poking at the model by hand |
+| `manual_test/` | `chat.py` — terminal chat loop; ask a yes/no question, get a yes/no |
 | `experiments/` | One directory per experiment: state, questions, results, notes |
 
 ## Sources
