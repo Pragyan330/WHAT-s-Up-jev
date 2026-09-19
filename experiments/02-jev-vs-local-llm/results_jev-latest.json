@@ -1,0 +1,295 @@
+{
+  "label": "jev-latest",
+  "meta": {
+    "backend": "jev"
+  },
+  "summary": {
+    "n": 15,
+    "tool_correct": 15,
+    "call_correct": 14,
+    "median_ms": 540.7,
+    "mean_ms": 1185.1,
+    "min_ms": 436.9,
+    "max_ms": 6707.5,
+    "mean_in_tokens": 1163.9,
+    "mean_out_tokens": 480.4,
+    "freeform_filled": "0/5"
+  },
+  "rows": [
+    {
+      "query": "what's the weather in Tokyo tomorrow",
+      "tool": "get_weather",
+      "arguments": {
+        "location": "Tokyo",
+        "units": "celsius"
+      },
+      "ms": 1450.1,
+      "confidence": 0.77,
+      "in_tokens": 1205,
+      "out_tokens": 527,
+      "tool_ok": true,
+      "args_ok": true,
+      "call_ok": true,
+      "per_arg": {
+        "location": true
+      },
+      "freeform_filled": false
+    },
+    {
+      "query": "whats the weather in San Francisco",
+      "tool": "get_weather",
+      "arguments": {
+        "location": "San Francisco",
+        "units": "fahrenheit"
+      },
+      "ms": 487.9,
+      "confidence": 0.73,
+      "in_tokens": 1155,
+      "out_tokens": 470,
+      "tool_ok": true,
+      "args_ok": true,
+      "call_ok": true,
+      "per_arg": {
+        "location": true
+      },
+      "freeform_filled": false
+    },
+    {
+      "query": "what's the temperature in Berlin",
+      "tool": "get_weather",
+      "arguments": {
+        "location": "Berlin",
+        "units": "celsius"
+      },
+      "ms": 436.9,
+      "confidence": 0.9,
+      "in_tokens": 1119,
+      "out_tokens": 429,
+      "tool_ok": true,
+      "args_ok": true,
+      "call_ok": true,
+      "per_arg": {
+        "location": true
+      },
+      "freeform_filled": false
+    },
+    {
+      "query": "text Sarah right now, it's an emergency",
+      "tool": "send_message",
+      "arguments": {
+        "recipient": "Sarah",
+        "urgency": "urgent"
+      },
+      "ms": 438.3,
+      "confidence": 1.0,
+      "in_tokens": 1222,
+      "out_tokens": 542,
+      "tool_ok": true,
+      "args_ok": true,
+      "call_ok": true,
+      "per_arg": {
+        "recipient": true,
+        "urgency": true
+      },
+      "freeform_filled": null
+    },
+    {
+      "query": "email Priya about the budget review, it can wait",
+      "tool": "send_message",
+      "arguments": {
+        "recipient": "Priya",
+        "urgency": "normal"
+      },
+      "ms": 2443.2,
+      "confidence": 0.83,
+      "in_tokens": 1219,
+      "out_tokens": 539,
+      "tool_ok": true,
+      "args_ok": true,
+      "call_ok": true,
+      "per_arg": {
+        "recipient": true,
+        "urgency": true
+      },
+      "freeform_filled": null
+    },
+    {
+      "query": "send a quick note to Marcus, no rush",
+      "tool": "send_message",
+      "arguments": {
+        "recipient": "Marcus",
+        "urgency": "normal"
+      },
+      "ms": 482.4,
+      "confidence": 1.0,
+      "in_tokens": 1207,
+      "out_tokens": 527,
+      "tool_ok": true,
+      "args_ok": true,
+      "call_ok": true,
+      "per_arg": {
+        "recipient": true,
+        "urgency": true
+      },
+      "freeform_filled": null
+    },
+    {
+      "query": "play some jazz, shuffled",
+      "tool": "play_music",
+      "arguments": {
+        "artist_or_track": "jazz",
+        "shuffle": true
+      },
+      "ms": 501.2,
+      "confidence": 0.98,
+      "in_tokens": 1158,
+      "out_tokens": 476,
+      "tool_ok": true,
+      "args_ok": true,
+      "call_ok": true,
+      "per_arg": {
+        "artist_or_track": true,
+        "shuffle": true
+      },
+      "freeform_filled": null
+    },
+    {
+      "query": "put on some Miles Davis",
+      "tool": "play_music",
+      "arguments": {
+        "artist_or_track": "some Miles Davis",
+        "shuffle": false
+      },
+      "ms": 6707.5,
+      "confidence": 0.87,
+      "in_tokens": 1163,
+      "out_tokens": 483,
+      "tool_ok": true,
+      "args_ok": true,
+      "call_ok": true,
+      "per_arg": {
+        "artist_or_track": true
+      },
+      "freeform_filled": null
+    },
+    {
+      "query": "shuffle my playlist",
+      "tool": "play_music",
+      "arguments": {
+        "artist_or_track": "playlist",
+        "shuffle": true
+      },
+      "ms": 601.0,
+      "confidence": 0.16,
+      "in_tokens": 1081,
+      "out_tokens": 391,
+      "tool_ok": true,
+      "args_ok": true,
+      "call_ok": true,
+      "per_arg": {
+        "shuffle": true
+      },
+      "freeform_filled": null
+    },
+    {
+      "query": "remind me to call the dentist on friday",
+      "tool": "create_reminder",
+      "arguments": {
+        "subject": "call the dentist"
+      },
+      "ms": 540.7,
+      "confidence": 1.0,
+      "in_tokens": 1202,
+      "out_tokens": 520,
+      "tool_ok": true,
+      "args_ok": true,
+      "call_ok": true,
+      "per_arg": {
+        "subject": true
+      },
+      "freeform_filled": false
+    },
+    {
+      "query": "set a reminder to water the plants tomorrow morning",
+      "tool": "create_reminder",
+      "arguments": {
+        "subject": "water the plants tomorrow"
+      },
+      "ms": 1547.8,
+      "confidence": 0.88,
+      "in_tokens": 1242,
+      "out_tokens": 568,
+      "tool_ok": true,
+      "args_ok": true,
+      "call_ok": true,
+      "per_arg": {
+        "subject": true
+      },
+      "freeform_filled": false
+    },
+    {
+      "query": "who won the world cup in 1998",
+      "tool": "search_web",
+      "arguments": {
+        "topic": "who"
+      },
+      "ms": 550.2,
+      "confidence": 0.41,
+      "in_tokens": 1149,
+      "out_tokens": 461,
+      "tool_ok": true,
+      "args_ok": false,
+      "call_ok": false,
+      "per_arg": {
+        "topic": false
+      },
+      "freeform_filled": null
+    },
+    {
+      "query": "look up the population of Iceland",
+      "tool": "search_web",
+      "arguments": {
+        "topic": "Iceland"
+      },
+      "ms": 505.2,
+      "confidence": 0.36,
+      "in_tokens": 1154,
+      "out_tokens": 473,
+      "tool_ok": true,
+      "args_ok": true,
+      "call_ok": true,
+      "per_arg": {
+        "topic": true
+      },
+      "freeform_filled": null
+    },
+    {
+      "query": "write me a poem about the ocean",
+      "tool": null,
+      "arguments": {},
+      "ms": 530.8,
+      "confidence": 1.0,
+      "in_tokens": 1125,
+      "out_tokens": 437,
+      "tool_ok": true,
+      "args_ok": true,
+      "call_ok": true,
+      "per_arg": {},
+      "freeform_filled": null
+    },
+    {
+      "query": "tell me a joke",
+      "tool": null,
+      "arguments": {},
+      "ms": 552.8,
+      "confidence": 1.0,
+      "in_tokens": 1057,
+      "out_tokens": 363,
+      "tool_ok": true,
+      "args_ok": true,
+      "call_ok": true,
+      "per_arg": {},
+      "freeform_filled": null
+    }
+  ]
+}
