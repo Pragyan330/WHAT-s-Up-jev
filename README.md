@@ -1,0 +1,47 @@
+# WHAT's Up Jev
+
+Notes and code from evaluating **Jev**, TypeSafe AI's System One model. This is a
+testing log, not a product. Nothing here is a recommendation.
+
+**This repo is public.** No keys, no customer data, no internal material. `.env`
+is gitignored; `.env.example` shows the variable names only.
+
+## What Jev is
+
+You give it application state and a set of typed questions; it returns typed
+judgments and probabilities. It does not generate text or reasoning traces. Code
+keeps the workflow and calls the model where semantic understanding is needed.
+
+Three primitives: **Choice** (one option from a set), **Noul** (whether a
+condition holds, as a probability), **Score** (position on ordered levels).
+
+## Setup
+
+```bash
+py -m venv .venv
+.venv/Scripts/python.exe -m pip install -r requirements.txt
+cp .env.example .env        # then paste your key into .env
+```
+
+Confirm the integration works end to end:
+
+```bash
+.venv/Scripts/python.exe src/verify_connection.py
+```
+
+That script exercises all three primitives on a trivial input with an obvious
+right answer, so a bad result points at the integration rather than the model.
+
+## Layout
+
+| Path | What it holds |
+| --- | --- |
+| `docs/setup-findings.md` | Verified API/SDK shapes and two corrections to the brief |
+| `src/` | Shared client code and the connection check |
+| `experiments/` | One directory per experiment: state, questions, results, notes |
+
+## Sources
+
+Live docs at [docs.typesafe.ai](https://docs.typesafe.ai) are the source of
+truth — Mintlify serves markdown by appending `.md` to any page path. Shapes in
+`docs/setup-findings.md` were additionally checked against the installed SDK.

@@ -1,0 +1,58 @@
+# ---- Secrets: this repo is PUBLIC. Never commit credentials. ----
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+*.p12
+secrets/
+credentials*
+*_secret*
+*apikey*
+*api_key*
+
+# ---- Python ----
+.venv/
+venv/
+env/
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.eggs/
+build/
+dist/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+
+# ---- Node ----
+node_modules/
+*.tsbuildinfo
+.npm/
+pnpm-debug.log*
+npm-debug.log*
+yarn-error.log*
+
+# ---- Editors / OS ----
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ---- Claude Code local state ----
+.claude/settings.local.json
+
+# ---- Private working brief: stays local, never published ----
+claude.md
+CLAUDE.md
+
+# ---- Scratch / run artifacts (raw dumps, not curated results) ----
+scratch/
+tmp/
+logs/
+*.log
+runs/raw/
+*.local.*
