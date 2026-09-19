@@ -1,6 +1,6 @@
 """Smallest real call to Jev: confirms the key, the wire shape, and all three primitives.
 
-Run once after filling in .env. Not an experiment — it only proves the pipe works.
+Run once after filling in .env. It proves the pipe works, nothing more.
 
     .venv/Scripts/python.exe src/verify_connection.py
 """
@@ -16,8 +16,8 @@ load_dotenv()
 if not os.getenv("TYPESAFE_API_KEY"):
     sys.exit("TYPESAFE_API_KEY is not set. Copy .env.example to .env and fill it in.")
 
-# A throwaway state with an obvious right answer, so a wrong result means the
-# integration is broken rather than the model being interesting.
+# A throwaway state with an obvious right answer. Anything wrong here points
+# at the integration, because the judgement itself is not hard.
 STATE = {
     "ticket": {
         "subject": "Charged twice for the October invoice",

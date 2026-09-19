@@ -2,7 +2,7 @@
 
     .venv/Scripts/python.exe manual_test/chat.py
 
-Jev does not generate text, so this is not a chatbot underneath. Each line you
+There is no chatbot underneath. Jev generates no text at all. Each line you
 type becomes the state, and one Noul asks whether the answer is yes. The reply
 is a probability that the code turns into a word.
 
@@ -34,7 +34,7 @@ QUESTION = Noul(
 
 
 def verdict(probability: float) -> str:
-    """A noul near 0.5 is genuinely torn, not a weak yes - say so rather than rounding."""
+    """A noul near 0.5 means torn between yes and no. Say that instead of rounding it."""
     if probability >= 0.6:
         return "yes"
     if probability <= 0.4:

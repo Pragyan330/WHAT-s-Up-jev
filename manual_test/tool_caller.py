@@ -2,15 +2,14 @@
 
     .venv/Scripts/python.exe manual_test/tool_caller.py
 
-The point of the experiment: an LLM doing tool calling pays full generation
-price to pick a function and fill its arguments. That step is a set of typed
-judgements, which is what System One is for. Everything after the call - the
-prose, the follow-up - is still the LLM's job.
+An LLM doing tool calling pays full generation price to pick a function and
+fill its arguments. That step is a set of typed judgements, which is what
+System One is for. The prose and the follow-up afterwards stay the LLM's job.
 
 Shape, following the function-calling and value-extraction cookbooks:
 
   * One Choice routes the request to a tool.
-  * Every tool's argument questions go out in the SAME request, speculatively.
+  * Every tool's argument questions go out in the same request, speculatively.
     They cannot see the routing answer, so each states its premise ("Assume
     the user is asking to ..."). Code then reads only the chosen tool's args.
   * Jev cannot generate text. Free-text arguments are handled by finding
@@ -18,8 +17,8 @@ Shape, following the function-calling and value-extraction cookbooks:
     one, so the value is a verbatim copy of the input or the no-match hatch.
   * Numeric and date arguments get no question at all and keep their default.
     jev-1.13 reads dates as text and does not count reliably.
-  * Reported confidence is the WEAKEST judgement in the call, not the product.
-    One wrong argument spoils the result regardless of how sure the rest were.
+  * Reported confidence is the weakest judgement in the call. One wrong
+    argument spoils the result however sure the rest were.
 """
 
 import json
@@ -42,9 +41,9 @@ STOPWORDS = {
 }
 QUOTED = re.compile(r"[\"'`]([^\"'`]{2,60})[\"'`]")
 CAPPED = re.compile(r"\b[A-Z][A-Za-z'\-]{1,}\b")
-# Allow a lowercase continuation, so "to call the dentist" offers the whole
-# phrase and not just "call". A span that is never a candidate can never be
-# chosen, so the phrase and its head word both go in the list.
+# Allow a lowercase continuation so that "to call the dentist" offers the
+# whole phrase as well as its head word. A span that is never a candidate can
+# never be chosen, so both go in the list.
 AFTER_PREP = re.compile(
     r"\b(?:in|to|for|at|about|with|near|on)\s+([A-Za-z][A-Za-z'\-]*(?:\s+[A-Za-z][A-Za-z'\-]*){0,3})"
 )
@@ -129,9 +128,9 @@ TOOLS = {
     },
     "search_web": {
         # Criteria must describe something decidable from the request itself.
-        # An earlier version said "information the assistant does not already
-        # hold", which asks the model about its own knowledge rather than about
-        # the state, and factual questions routed to no tool at all.
+        # Describing this tool by what the assistant already knows asks the
+        # model about its own knowledge, which is nowhere in the state, and
+        # factual questions then route to no tool at all.
         "description": "Look up a fact or information. The user wants to know something, "
                        "rather than have an action performed.",
         "premise": "the user is asking to search the web",
