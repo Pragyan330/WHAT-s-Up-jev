@@ -43,6 +43,7 @@ right answer, so a bad result points at the integration rather than the model.
 | `experiments/01-tool-calling/` | Can Jev replace the tool-calling step of an LLM |
 | `experiments/02-jev-vs-local-llm/` | The same task against local Qwen3.5 4B and 2B |
 | `experiments/03-memory-lookup-decision/` | Can a cheap judgement decide when to skip retrieval |
+| `experiments/04-choice-option-scaling/` | How many options a Choice holds (255), and whether accuracy, latency and cost hold up at that size |
 
 ## Sources
 
