@@ -1,0 +1,193 @@
+{
+  "summary": {
+    "n": 16,
+    "should_act": {
+      "n": 8,
+      "min": 0.72,
+      "median": 0.75
+    },
+    "should_decline": {
+      "n": 8,
+      "max": 0.7,
+      "median": 0.64
+    },
+    "separable": true,
+    "gap": [
+      0.7,
+      0.72
+    ],
+    "suggested_threshold": 0.71,
+    "none_option_would_catch": 0,
+    "none_option_false_alarms": 0
+  },
+  "rows": [
+    {
+      "task": "marginal_route",
+      "should_act": false,
+      "rep": 0,
+      "picked": "8",
+      "picked_label": "Open Preferences",
+      "target_present": 0.64,
+      "p_target": 0.91,
+      "chose_none": false
+    },
+    {
+      "task": "marginal_route",
+      "should_act": false,
+      "rep": 1,
+      "picked": "8",
+      "picked_label": "Open Preferences",
+      "target_present": 0.63,
+      "p_target": 0.89,
+      "chose_none": false
+    },
+    {
+      "task": "marginal_route",
+      "should_act": false,
+      "rep": 2,
+      "picked": "8",
+      "picked_label": "Open Preferences",
+      "target_present": 0.68,
+      "p_target": 0.93,
+      "chose_none": false
+    },
+    {
+      "task": "marginal_route",
+      "should_act": false,
+      "rep": 3,
+      "picked": "8",
+      "picked_label": "Open Preferences",
+      "target_present": 0.64,
+      "p_target": 0.9,
+      "chose_none": false
+    },
+    {
+      "task": "marginal_route",
+      "should_act": false,
+      "rep": 4,
+      "picked": "8",
+      "picked_label": "Open Preferences",
+      "target_present": 0.61,
+      "p_target": 0.92,
+      "chose_none": false
+    },
+    {
+      "task": "marginal_route",
+      "should_act": false,
+      "rep": 5,
+      "picked": "8",
+      "picked_label": "Open Preferences",
+      "target_present": 0.63,
+      "p_target": 0.92,
+      "chose_none": false
+    },
+    {
+      "task": "marginal_route",
+      "should_act": false,
+      "rep": 6,
+      "picked": "8",
+      "picked_label": "Open Preferences",
+      "target_present": 0.7,
+      "p_target": 0.93,
+      "chose_none": false
+    },
+    {
+      "task": "marginal_route",
+      "should_act": false,
+      "rep": 7,
+      "picked": "8",
+      "picked_label": "Open Preferences",
+      "target_present": 0.68,
+      "p_target": 0.93,
+      "chose_none": false
+    },
+    {
+      "task": "wizard_variant",
+      "should_act": true,
+      "rep": 0,
+      "picked": "5",
+      "picked_label": "Start Send Report",
+      "target_present": 0.76,
+      "p_target": 0.96,
+      "chose_none": false
+    },
+    {
+      "task": "wizard_variant",
+      "should_act": true,
+      "rep": 1,
+      "picked": "5",
+      "picked_label": "Start Send Report",
+      "target_present": 0.76,
+      "p_target": 0.96,
+      "chose_none": false
+    },
+    {
+      "task": "wizard_variant",
+      "should_act": true,
+      "rep": 2,
+      "picked": "5",
+      "picked_label": "Start Send Report",
+      "target_present": 0.73,
+      "p_target": 0.96,
+      "chose_none": false
+    },
+    {
+      "task": "wizard_variant",
+      "should_act": true,
+      "rep": 3,
+      "picked": "5",
+      "picked_label": "Start Send Report",
+      "target_present": 0.74,
+      "p_target": 0.96,
+      "chose_none": false
+    },
+    {
+      "task": "wizard_variant",
+      "should_act": true,
+      "rep": 4,
+      "picked": "5",
+      "picked_label": "Start Send Report",
+      "target_present": 0.72,
+      "p_target": 0.96,
+      "chose_none": false
+    },
+    {
+      "task": "wizard_variant",
+      "should_act": true,
+      "rep": 5,
+      "picked": "5",
+      "picked_label": "Start Send Report",
+      "target_present": 0.74,
+      "p_target": 0.96,
+      "chose_none": false
+    },
+    {
+      "task": "wizard_variant",
+      "should_act": true,
+      "rep": 6,
+      "picked": "5",
+      "picked_label": "Start Send Report",
+      "target_present": 0.76,
+      "p_target": 0.96,
+      "chose_none": false
+    },
+    {
+      "task": "wizard_variant",
+      "should_act": true,
+      "rep": 7,
+      "picked": "5",
+      "picked_label": "Start Send Report",
+      "target_present": 0.77,
+      "p_target": 0.96,
+      "chose_none": false
+    }
+  ],
+  "budget": {
+    "calls": 16,
+    "in_tokens": 23496,
+    "out_tokens": 2352,
+    "est_usd": 0.00065,
+    "lifetime_calls": 293,
+    "lifetime_cap": 400
+  }
+}

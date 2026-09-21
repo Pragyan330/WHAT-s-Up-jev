@@ -1,2 +1,6 @@
 typesafe-sdk==0.7.0
 python-dotenv==1.2.3
+
+# agentic_test_env: Windows UI Automation client for scraping a window's controls
+uiautomation==2.0.29
+comtypes==1.4.17

@@ -1,0 +1,178 @@
+{
+  "goal": "Play the song 'Beethoven Moonlight Sonata' on YouTube. Use the search box to search for it, then open the most relevant video result so that it starts playing. If a cookie or consent notice is blocking the page, dismiss it, preferring an option that rejects non-essential cookies over one that accepts everything. Do not sign in, subscribe, comment, or share anything.",
+  "query": "Beethoven Moonlight Sonata",
+  "dry_run": false,
+  "allowed_domains": [
+    "youtube.com",
+    "youtu.be",
+    "consent.youtube.com",
+    "consent.google.com"
+  ],
+  "steps": [
+    {
+      "step": 1,
+      "stats": {
+        "found": 19,
+        "after_dedupe": 19,
+        "kept": 19,
+        "dropped_for_cap": 0,
+        "ms": 8.5
+      },
+      "decision": {
+        "picked": "3",
+        "picked_label": "Search (text field)",
+        "p_target": 1.0,
+        "confidence": 1.0,
+        "target_present": 0.97,
+        "task_complete": 0.01,
+        "text_to_type": "Beethoven Moonlight Sonata",
+        "ms": 972.6,
+        "in_tokens": 1775,
+        "out_tokens": 243,
+        "n_options": 20
+      },
+      "playback_before": {
+        "found": false,
+        "title": "YouTube",
+        "url": "https://www.youtube.com/"
+      },
+      "tier": "reversible",
+      "outcome": "acted",
+      "plan": {
+        "action": "type",
+        "label": "Search",
+        "host": "www.youtube.com",
+        "value": "Beethoven Moonlight Sonata",
+        "performed": true,
+        "submitted": true
+      }
+    },
+    {
+      "step": 2,
+      "stats": {
+        "found": 49,
+        "after_dedupe": 35,
+        "kept": 35,
+        "dropped_for_cap": 0,
+        "ms": 5.7
+      },
+      "decision": {
+        "picked": "5",
+        "picked_label": "Search (button)",
+        "p_target": 0.7,
+        "confidence": 0.69,
+        "target_present": 0.93,
+        "task_complete": 0.02,
+        "text_to_type": "Beethoven Moonlight Sonata",
+        "ms": 355.1,
+        "in_tokens": 2716,
+        "out_tokens": 371,
+        "n_options": 36
+      },
+      "playback_before": {
+        "found": false,
+        "title": "Beethoven Moonlight Sonata - YouTube",
+        "url": "https://www.youtube.com/results?search_query=Beethoven+Moonlight+Sonata"
+      },
+      "tier": "reversible",
+      "outcome": "acted",
+      "plan": {
+        "action": "click",
+        "label": "Search",
+        "host": "www.youtube.com",
+        "value": null,
+        "performed": true
+      }
+    },
+    {
+      "step": 3,
+      "stats": {
+        "found": 40,
+        "after_dedupe": 39,
+        "kept": 39,
+        "dropped_for_cap": 0,
+        "ms": 8.8
+      },
+      "decision": {
+        "picked": "18",
+        "picked_label": "Beethoven - Moonlight Sonata (FULL) 15 minutes (link)",
+        "p_target": 0.72,
+        "confidence": 0.71,
+        "target_present": 0.95,
+        "task_complete": 0.05,
+        "text_to_type": "Beethoven Moonlight Sonata",
+        "ms": 419.4,
+        "in_tokens": 2839,
+        "out_tokens": 404,
+        "n_options": 40
+      },
+      "playback_before": {
+        "found": false,
+        "title": "Beethoven Moonlight Sonata - YouTube",
+        "url": "https://www.youtube.com/results?search_query=Beethoven+Moonlight+Sonata"
+      },
+      "tier": "reversible",
+      "outcome": "acted",
+      "plan": {
+        "action": "click",
+        "label": "Beethoven - Moonlight Sonata (FULL) 15 minutes",
+        "host": "www.youtube.com",
+        "value": null,
+        "performed": true
+      }
+    },
+    {
+      "step": 4,
+      "stats": {
+        "found": 14,
+        "after_dedupe": 14,
+        "kept": 14,
+        "dropped_for_cap": 0,
+        "ms": 12.8
+      },
+      "decision": {
+        "picked": "none",
+        "picked_label": null,
+        "p_target": 0.79,
+        "confidence": 0.77,
+        "target_present": 0.36,
+        "task_complete": 0.64,
+        "text_to_type": "Beethoven Moonlight Sonata",
+        "ms": 389.7,
+        "in_tokens": 1737,
+        "out_tokens": 203,
+        "n_options": 15
+      },
+      "playback_before": {
+        "currentTime": 0,
+        "duration": 20,
+        "found": true,
+        "muted": false,
+        "paused": false,
+        "title": "YouTube",
+        "url": "https://www.youtube.com/watch?v=4Tr0otuiQuU&list=RD4Tr0otuiQuU&start_radio=1",
+        "volume": 0.5623413251903491
+      },
+      "outcome": "declined_none"
+    }
+  ],
+  "final": {
+    "currentTime": 0.56,
+    "duration": 20,
+    "found": true,
+    "muted": false,
+    "paused": false,
+    "title": "Beethoven - Moonlight Sonata (FULL) - YouTube",
+    "url": "https://www.youtube.com/watch?v=4Tr0otuiQuU&list=RD4Tr0otuiQuU&start_radio=1",
+    "volume": 0.5623413251903491
+  },
+  "playing": true,
+  "budget": {
+    "calls": 4,
+    "in_tokens": 9067,
+    "out_tokens": 1221,
+    "est_usd": 0.000259,
+    "lifetime_calls": 359,
+    "lifetime_cap": 800
+  }
+}

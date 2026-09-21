@@ -1,0 +1,5 @@
+# Per-run machine state, regenerated on every launch. The curated evidence
+# (results.json, threshold_probe.json) is kept; the churn is not.
+runtime/click_log.jsonl
+runtime/manifest.json
+runtime/api_budget.json
