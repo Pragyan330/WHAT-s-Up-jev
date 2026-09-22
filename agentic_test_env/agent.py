@@ -30,7 +30,7 @@ from __future__ import annotations
 import json
 import re
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -113,7 +113,7 @@ class BudgetGuard:
 # candidate text spans, found by code
 # --------------------------------------------------------------------------
 
-TRIGGERS = r"(?:search(?:\s+for)?|type|enter|write|put|fill in|look up|find)"
+TRIGGERS = (r"(?:search(?:\s+for)?|type|enter|write|put|fill in|look up|find|open|launch|start|go\s+to|play)")
 
 
 def text_candidates(request: str) -> list[str]:
@@ -154,6 +154,11 @@ class Decision:
     in_tokens: int
     out_tokens: int
     n_options: int
+    # The full distribution, kept because the winner alone does not say whether a
+    # decision was clear or a coin flip. The 'explain' command needed it and the
+    # field did not exist, which is what happens when a debugging aid is written
+    # but never actually run.
+    probabilities: dict[str, float] = field(default_factory=dict)
 
     def as_dict(self) -> dict:
         return {"picked": self.target_key,
@@ -178,7 +183,13 @@ CLICK_INSTRUCTIONS = (
     "actions to finish: a control that begins a multi-step flow, or advances one "
     "already under way, is the correct answer even though more steps will follow "
     "it. When the request states a preference for a later step, use it to pick "
-    "between options at that later step, not as a reason to avoid starting."
+    "between options at that later step, not as a reason to avoid starting. "
+    "If the request needs an application or a website that is plainly not among "
+    "these controls, opening the Start menu is a real next step and not a "
+    "failure: it leads to a search box that can find and open any installed "
+    "application, and to the taskbar, which reaches applications that are "
+    "already running. Prefer that over 'none' whenever what is missing is the "
+    "application itself rather than the right control inside it."
 )
 
 # The first version of this asked whether the control needed to "carry out" the
@@ -223,11 +234,13 @@ def decide(client: TypeSafeClient, budget: BudgetGuard, request: str,
     # with legitimate progress.
     options[NONE_KEY] = (
         "No control listed here should be used as the next action. Choose this "
-        "only when there is nothing useful to click or type next: the controls "
-        "needed belong to a different application or do not exist here, or the "
-        "request is already fully done, or every step still on offer is one the "
-        "user explicitly asked not to take. Do not choose this merely because one "
-        "click will not finish the whole request on its own.")
+        "only when there is nothing useful to click or type next: the request is "
+        "already fully done, or every step still on offer is one the user "
+        "explicitly asked not to take, or nothing here leads anywhere useful. Do "
+        "not choose this merely because one click will not finish the whole "
+        "request on its own, and do not choose it just because the application "
+        "needed is not open - if a way to open the Start menu or reach the "
+        "taskbar is listed, that is the step to take instead.")
 
     listing = "; ".join(f"{e.number}. {e.describe()}" for e in elements)
     if actions is None:
@@ -311,4 +324,66 @@ def decide(client: TypeSafeClient, budget: BudgetGuard, request: str,
         in_tokens=response.usage.input_tokens,
         out_tokens=response.usage.output_tokens,
         n_options=len(options),
+        probabilities=dict(probs),
     )
+
+
+# --------------------------------------------------------------------------
+# picking the window itself, from a description in plain language
+# --------------------------------------------------------------------------
+#
+# Choosing which window to drive is the same shape as choosing which control to
+# click: a Choice over a list, with a no-match option. So "the notepad window" or
+# "my browser" resolves the same way everything else does, instead of needing an
+# exact title typed by hand.
+#
+# Protected windows are not offered at all. Listing something the executor would
+# refuse anyway spends an option slot to produce a decision code has to overrule,
+# and the honest answer for "drive my editor" is that there is no eligible window
+# - which is what the none option says.
+
+WINDOW_INSTRUCTIONS = (
+    "Each option is an application window currently open on the user's screen, "
+    "given as its title bar text followed by its window class. `wanted` is how "
+    "the user described the window they want to work in. Choose the window they "
+    "meant. Choose 'none' if no listed window plausibly matches the description."
+)
+
+
+def pick_window(client: TypeSafeClient, budget: BudgetGuard, wanted: str,
+                windows: list[dict]) -> dict:
+    """Resolve a plain-language description to one of the open windows."""
+    budget.check()
+    options = {str(i): f"{w['title']} (class {w['class_name'] or 'unknown'})"
+               for i, w in enumerate(windows, start=1)}
+    options[NONE_KEY] = ("None of these windows matches the description, or the "
+                         "application the user means is not open.")
+
+    start = time.perf_counter()
+    response = client.system_one(
+        state={"wanted": wanted,
+               "open_windows": "; ".join(f"{i}. {o}" for i, o in options.items()
+                                         if i != NONE_KEY)},
+        questions={
+            "window": Choice(instructions=WINDOW_INSTRUCTIONS, criteria=options),
+            "is_open": Noul(
+                instructions=("`wanted` describes a window the user wants to "
+                              "work in. Is that window among the ones listed in "
+                              "`open_windows`?"),
+                criteria={
+                    "true": "One of the listed windows is the one described, or "
+                            "is clearly the same application.",
+                    "false": "The described window is not listed. The "
+                             "application is probably not running.",
+                }),
+        })
+    ms = (time.perf_counter() - start) * 1000
+    budget.record(response.usage)
+
+    answer = response.answers["window"]
+    key = answer.choice
+    return {"index": None if key == NONE_KEY else int(key) - 1,
+            "p": answer.probabilities.get(key, 0.0),
+            "confidence": answer.confidence,
+            "is_open": response.answers["is_open"].noul,
+            "ms": ms}

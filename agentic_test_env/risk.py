@@ -44,14 +44,25 @@ _UNRECOVERABLE = re.compile(
     r"uninstall|format\s+(?:disk|drive)|empty\s+(?:trash|bin)|"
     r"reset\s+to\s+defaults|remove\s+all|clear\s+all|drop\s+(?:table|database))\b")
 
-_CONSEQUENTIAL = re.compile(
-    r"\b(send|submit|publish|post|pay|buy|purchase|order|checkout|confirm|"
-    r"archive|schedule|share|invite|sign\s*out|log\s*out|shut\s*down|restart|"
-    r"transfer|withdraw|apply\s+changes|"
-    # Web-specific commitments. These tell other people something or change an
-    # account, and on a real page they sit one click from everything else.
-    r"subscribe|unsubscribe|follow|report|flag|donate|join|comment|upload|"
-    r"accept\s+all|agree\s+to\s+all|sign\s*in|log\s*in)\b")
+# Words that are verbs wherever they appear in a label.
+_CONSEQUENTIAL_ANY = re.compile(
+    r"\b(send|submit|publish|pay|buy|purchase|checkout|confirm|"
+    r"schedule|invite|sign\s*out|log\s*out|sign\s*in|log\s*in|shut\s*down|"
+    r"restart|transfer|withdraw|apply\s+changes|subscribe|unsubscribe|donate|"
+    r"upload|accept\s+all|agree\s+to\s+all|place\s+(?:order|bid)|buy\s*now)\b")
+
+# Words that are only actions when they LEAD the label, because each is also an
+# ordinary noun. "Save Report" is a document, not a commitment - it was tiered
+# consequential on the word "report" and made a plain save ask for permission.
+# Same mistake as "Start Send Report": the verb is the action, the rest is its
+# subject, and a bare keyword search cannot tell them apart.
+_CONSEQUENTIAL_LEAD = re.compile(
+    r"^\s*(report|flag|post|share|order|comment|join|follow|archive)\b")
+
+# A label ending in one of these is naming a place, not an action: "Order
+# history" and "Activity log" are links. Checked before the lead rule, which
+# would otherwise tier "Order history" as a purchase.
+_NOUNY_TAIL = re.compile(r"\b(history|settings|list|folder|log|archive|inbox)\s*$")
 
 
 # A leading navigational verb decides the tier, because the verb is the action and
@@ -70,23 +81,45 @@ _NAVIGATIONAL = re.compile(
     r"back|next|previous|close|skip|attach|add|refresh|reload)\b")
 
 
+# A bare "Close" / "Exit" / "Quit" is the window itself, not a panel inside it.
+# This matters because real-app mode stops hiding window chrome, so the title
+# bar's Close button became a clickable option tiered `reversible` by the
+# navigational rule - and closing an application with unsaved work in it is not
+# reversible. "Close Preferences" keeps its subject and stays cheap.
+_CLOSE_WINDOW = re.compile(r"^\s*(close|exit|quit)(\s+window)?\s*$")
+
+
 def tier(label: str) -> str:
     text = (label or "").lower()
     if _UNRECOVERABLE.search(text):
         return UNRECOVERABLE
+    if _CLOSE_WINDOW.match(text):
+        return CONSEQUENTIAL
     if _NAVIGATIONAL.match(text):
         return REVERSIBLE
-    if _CONSEQUENTIAL.search(text):
+    if _CONSEQUENTIAL_ANY.search(text):
+        return CONSEQUENTIAL
+    if _NOUNY_TAIL.search(text):
+        return REVERSIBLE
+    if _CONSEQUENTIAL_LEAD.match(text):
         return CONSEQUENTIAL
     return REVERSIBLE
 
 
-# (min Choice probability, min target_present). Calibrated against the observed
-# spread rather than guessed: correct reversible picks ran p>=0.78/present>=0.62,
-# correct declines ran p<=0.44 or present<=0.52, and correct terminal sends ran
-# p=1.00/present=0.96.
+# (min Choice probability, min target_present).
+# The reversible bar came down from 0.70/0.55 after enough real-app runs to see
+# the two groups separate. Correct reversible picks that got blocked ran 0.63,
+# 0.65, 0.68, 0.69 - Calculator's next digit, a wizard step, opening Start. Picks
+# that SHOULD have been refused ran 0.42, 0.43, 0.44 - re-clicking a search box
+# with nothing better on screen, and the final send on a task that said not to
+# send. There is a real gap between 0.44 and 0.63, and 0.70 sat on the wrong side
+# of it, refusing correct cheap actions to guard against expensive mistakes that
+# the other two tiers already guard against properly.
+#
+# The asymmetry is the point: a wrong reversible click costs a click, so it
+# should be easy to take. Consequential and unrecoverable are untouched.
 GATES: dict[str, tuple[float, float]] = {
-    REVERSIBLE: (0.70, 0.55),
+    REVERSIBLE: (0.55, 0.50),
     CONSEQUENTIAL: (0.90, 0.80),
     UNRECOVERABLE: (0.98, 0.95),
 }

@@ -55,6 +55,13 @@ class Element:
     window: str
     rect: tuple[int, int, int, int]
     control: object = field(repr=False, default=None)
+    state: str = ""          # "on", "off", "selected"... when the control has one
+    # Which target window this element was scraped from. Provenance is exact,
+    # whereas walking back up from the element to guess its window is not: Start
+    # on Windows 11 is composed of several bridged top-level HWNDs, so the search
+    # box's root handle is not the Start handle the scraper was given, and a
+    # scope check built on re-derivation refused an element it had just produced.
+    source_hwnd: int = 0
 
     def describe(self) -> str:
         """What the model sees. Label plus a hint at what kind of control it is."""
@@ -63,6 +70,12 @@ class Element:
             noun = "menu item"
         elif self.control_type == "CheckBoxControl":
             noun = "checkbox"
+        # Current state belongs in the description. Without it "Word wrap" reads
+        # identically whether it is on or off, so a request to turn it ON gets a
+        # blind toggle that turns it off - which is exactly what happened in
+        # Notepad, and the agent then reported the task complete.
+        if self.state:
+            return f"{self.label} ({noun}, currently {self.state}, {self.window})"
         return f"{self.label} ({noun}, {self.window})"
 
 
@@ -118,65 +131,229 @@ def _nearest_label(element, siblings) -> str:
     return best
 
 
+def list_top_level(include_offscreen: bool = False) -> list[dict]:
+    """Every visible top-level window, for picking a target by hand.
+
+    Identity is the window HANDLE, not the title. Real applications rewrite their
+    titles constantly - an editor prepends a dot when a file is dirty, a browser
+    retitles on every navigation - so a title-based allowlist silently stops
+    matching the window it was meant to protect, or starts matching a different
+    one. The handle does not move.
+    """
+    out: list[dict] = []
+    root = auto.GetRootControl()
+    for control, _ in auto.WalkControl(root, includeTop=False, maxDepth=1):
+        if control.ControlTypeName not in ("WindowControl", "PaneControl"):
+            continue
+        title = (control.Name or "").strip()
+        if not title:
+            continue
+        try:
+            if control.IsOffscreen and not include_offscreen:
+                continue
+            r = control.BoundingRectangle
+            if (r.width() <= 0 or r.height() <= 0) and not include_offscreen:
+                continue
+            hwnd = control.NativeWindowHandle
+        except Exception:
+            continue
+        if not hwnd:
+            continue
+        out.append({"hwnd": int(hwnd), "title": title,
+                    "class_name": control.ClassName or "",
+                    "rect": (r.left, r.top, r.width(), r.height()),
+                    "control": control})
+    return out
+
+
+_TOGGLE_WORDS = {0: "off", 1: "on", 2: "partly on"}
+
+
+def _read_state(control, ctype: str) -> str:
+    """Read a control's on/off or selected state, where it has one.
+
+    Only attempted for the control types that can carry one, because each probe
+    is a cross-process UIA call and doing it for every button would cost more
+    than it returns.
+    """
+    if ctype in ("CheckBoxControl", "MenuItemControl", "RadioButtonControl",
+                 "ButtonControl"):
+        try:
+            return _TOGGLE_WORDS.get(control.GetTogglePattern().ToggleState, "")
+        except Exception:
+            pass
+    if ctype in ("ListItemControl", "TabItemControl", "RadioButtonControl"):
+        try:
+            return ("selected" if control.GetSelectionItemPattern().IsSelected
+                    else "not selected")
+        except Exception:
+            pass
+    return ""
+
+
+def _is_readable(text: str) -> bool:
+    """Reject icon-font glyphs masquerading as text.
+
+    Modern Windows apps label icons with characters from the Unicode Private Use
+    Area, so Calculator's own tree yields entries like U+E81C alongside "Display
+    is 1". They are meaningless to a reader and they crowd out the real state.
+    """
+    if not any(ch.isalnum() for ch in text):
+        return False
+    pua = sum(1 for ch in text if "" <= ch <= "")
+    return pua * 2 <= len(text)
+
+
+def _collect(win, title: str, max_depth: int, elements: list[Element],
+             stats: dict, include_chrome: bool = False,
+             source_hwnd: int = 0) -> None:
+    """Prune one window's tree down to the controls worth offering."""
+    nodes = list(auto.WalkControl(win, includeTop=False, maxDepth=max_depth))
+    stats["walked"] += len(nodes)
+    texts = [(c, c.Name) for c, _ in nodes
+             if c.ControlTypeName == "TextControl" and c.Name]
+
+    # The readable text of a window is state, not decoration, and it was being
+    # thrown away after being used to label anonymous fields. A calculator's
+    # display, a status bar, a validation message: without them the agent works
+    # from its own action history alone and has no way to confirm where it got to.
+    seen = stats.setdefault("texts", [])
+    for _c, name in texts:
+        name = name.strip()
+        if name and name not in seen and _is_readable(name):
+            seen.append(name)
+
+    for control, _depth in nodes:
+        _consider(control, title, texts, elements, stats, include_chrome,
+                  source_hwnd)
+
+
+def _dedupe(elements: list[Element], stats: dict) -> list[Element]:
+    """One control exposed twice is one option, not two.
+
+    Notepad's menu bar reports File, Edit and View as both a MenuItemControl and
+    a ButtonControl at byte-identical rectangles. Offering both splits the
+    probability between two answers that are equally correct, which drags the
+    winner's score down toward the act/decline bar for no reason - the model was
+    not uncertain, the option list was redundant. Same window, same label, same
+    rectangle means the same thing to click.
+    """
+    seen: set[tuple] = set()
+    kept: list[Element] = []
+    for e in elements:
+        key = (e.window, e.label.strip().lower(), e.kind, e.rect)
+        if key in seen:
+            continue
+        seen.add(key)
+        kept.append(e)
+    stats["deduped"] = len(elements) - len(kept)
+    return kept
+
+
+def _number(elements: list[Element], t0: float, stats: dict
+            ) -> tuple[list[Element], dict]:
+    elements = _dedupe(elements, stats)
+    elements.sort(key=lambda e: (e.window, e.rect[1] // 20, e.rect[0]))
+    for i, e in enumerate(elements, start=1):
+        e.number = i
+    stats["kept"] = len(elements)
+    stats["ms"] = round((time.perf_counter() - t0) * 1000, 1)
+    return elements, stats
+
+
+def _new_stats() -> dict:
+    return {"walked": 0, "pruned": {"chrome": 0, "disabled": 0, "offscreen": 0,
+                                    "no_rect": 0, "unnamed": 0,
+                                    "not_actionable": 0}}
+
+
+def scrape_hwnds(handles: list[int], titles: dict[int, str],
+                 max_depth: int = 6, include_chrome: bool = False
+                 ) -> tuple[list[Element], dict]:
+    """Scrape windows identified by handle, which is what a live target needs.
+
+    `include_chrome` keeps menu bars and window buttons. Off for the mock tests,
+    where the title bar's Close button was a second right answer that made
+    accuracy unreadable. On for real software, where "File" is how you get
+    anywhere and dropping the menu bar removes most of the application.
+    """
+    t0 = time.perf_counter()
+    elements: list[Element] = []
+    stats = _new_stats()
+    for hwnd in handles:
+        try:
+            win = auto.ControlFromHandle(hwnd)
+        except Exception:
+            continue
+        if win is None:
+            continue
+        _collect(win, titles.get(hwnd, win.Name or str(hwnd)), max_depth,
+                 elements, stats, include_chrome, source_hwnd=hwnd)
+    return _number(elements, t0, stats)
+
+
 def scrape(titles: list[str], max_depth: int = 6) -> tuple[list[Element], dict]:
     """Walk the allowlisted windows and return numbered, actionable elements."""
     t0 = time.perf_counter()
     elements: list[Element] = []
-    stats = {"walked": 0, "pruned": {"chrome": 0, "disabled": 0, "offscreen": 0,
-                                     "no_rect": 0, "unnamed": 0, "not_actionable": 0}}
+    stats = _new_stats()
 
     for title, win in find_windows(titles):
-        nodes = list(auto.WalkControl(win, includeTop=False, maxDepth=max_depth))
-        stats["walked"] += len(nodes)
-        texts = [(c, c.Name) for c, _ in nodes
-                 if c.ControlTypeName == "TextControl" and c.Name]
+        try:
+            handle = int(win.NativeWindowHandle or 0)
+        except Exception:
+            handle = 0
+        _collect(win, title, max_depth, elements, stats, source_hwnd=handle)
 
-        for control, _depth in nodes:
-            ctype = control.ControlTypeName
-            if ctype in CHROME or control.Name in CHROME_NAMES:
-                stats["pruned"]["chrome"] += 1
-                continue
-            if ctype not in CLICKABLE and ctype not in TYPEABLE:
-                stats["pruned"]["not_actionable"] += 1
-                continue
-            try:
-                if not control.IsEnabled:
-                    stats["pruned"]["disabled"] += 1
-                    continue
-                if control.IsOffscreen:
-                    stats["pruned"]["offscreen"] += 1
-                    continue
-                r = control.BoundingRectangle
-                if r.width() <= 0 or r.height() <= 0:
-                    stats["pruned"]["no_rect"] += 1
-                    continue
-            except Exception:
-                stats["pruned"]["no_rect"] += 1
-                continue
+    return _number(elements, t0, stats)
 
-            label = (control.Name or "").strip()
-            if not label and ctype in TYPEABLE:
-                label = _nearest_label(control, texts)
-            if not label:
-                stats["pruned"]["unnamed"] += 1
-                continue
 
-            elements.append(Element(
-                number=0, label=label,
-                kind="type" if ctype in TYPEABLE else "click",
-                control_type=ctype, window=title,
-                rect=(r.left, r.top, r.width(), r.height()), control=control))
+def _consider(control, title: str, texts, elements: list[Element],
+              stats: dict, include_chrome: bool = False,
+              source_hwnd: int = 0) -> None:
+    """Keep or prune one node. Shared by both scrape entry points.
 
-    # Reading order, which is how a human numbering overlay would do it. Sorting
-    # is cosmetic - experiment 04 found no positional bias - but it keeps the
-    # numbers stable between two scrapes of an unchanged screen.
-    elements.sort(key=lambda e: (e.window, e.rect[1] // 20, e.rect[0]))
-    for i, e in enumerate(elements, start=1):
-        e.number = i
+    This was lifted out of the scrape loop, so every skip is a `return` rather
+    than a `continue`. Worth saying because the first cut of the extraction left
+    the `continue`s in place, which `ast.parse` accepts happily - that check runs
+    at compile time, not parse time, so a syntax check that only parses will miss
+    it.
+    """
+    ctype = control.ControlTypeName
+    if not include_chrome and (ctype in CHROME or control.Name in CHROME_NAMES):
+        stats["pruned"]["chrome"] += 1
+        return
+    if ctype not in CLICKABLE and ctype not in TYPEABLE:
+        stats["pruned"]["not_actionable"] += 1
+        return
+    try:
+        if not control.IsEnabled:
+            stats["pruned"]["disabled"] += 1
+            return
+        if control.IsOffscreen:
+            stats["pruned"]["offscreen"] += 1
+            return
+        r = control.BoundingRectangle
+        if r.width() <= 0 or r.height() <= 0:
+            stats["pruned"]["no_rect"] += 1
+            return
+    except Exception:
+        stats["pruned"]["no_rect"] += 1
+        return
 
-    stats["kept"] = len(elements)
-    stats["ms"] = round((time.perf_counter() - t0) * 1000, 1)
-    return elements, stats
+    label = (control.Name or "").strip()
+    if not label and ctype in TYPEABLE:
+        label = _nearest_label(control, texts)
+    if not label:
+        stats["pruned"]["unnamed"] += 1
+        return
+
+    elements.append(Element(
+        number=0, label=label,
+        kind="type" if ctype in TYPEABLE else "click",
+        control_type=ctype, window=title,
+        rect=(r.left, r.top, r.width(), r.height()), control=control,
+        state=_read_state(control, ctype), source_hwnd=source_hwnd))
 
 
 def _top_level_title(control) -> str:

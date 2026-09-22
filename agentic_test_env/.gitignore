@@ -3,3 +3,9 @@
 runtime/click_log.jsonl
 runtime/manifest.json
 runtime/api_budget.json
+
+# Live-run logs record the titles of whatever windows were driven, which on a
+# real machine means someone's open documents and browser tabs. Regenerable,
+# and this repo is public.
+runtime/agent_run_log.jsonl
+runtime/control_log.jsonl

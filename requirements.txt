@@ -4,3 +4,21 @@ python-dotenv==1.2.3
 # agentic_test_env: Windows UI Automation client for scraping a window's controls
 uiautomation==2.0.29
 comtypes==1.4.17
+
+# Selenium drives the browser path, where UIA cannot see a page
+selenium==4.49.0
+
+# --- experiments/05: UI element detection (OmniParser icon_detect, a YOLOv8) ---
+# Install torch FIRST from the CUDA index, or pip resolves a CPU build and the
+# detector runs at 790 ms instead of 51 ms:
+#   pip install torch==2.14.0 torchvision --index-url https://download.pytorch.org/whl/cu130
+# cu130 because this machine is Blackwell (sm_120). cu126 does not support it,
+# and cu128/cu129 ship no cp314 build of this torch version. Verify with
+# torch.cuda.get_arch_list() - is_available() returns True on builds that then
+# fail at kernel launch.
+ultralytics==8.4.159
+huggingface-hub==1.32.0
+
+# --- OCR fallback: built, measured, not used by default (see ocr_scrape.py) ---
+pillow==12.3.0
+winocr==0.0.15

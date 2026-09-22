@@ -514,6 +514,99 @@ realtime model: the decision layer is fast, the browser is not.
   a reminder that a log line describing a stall and a log line describing a
   success should never be interchangeable.
 
+## agent_run.py — type a prompt, drive a real window
+
+[`agent_run.py`](agent_run.py) is the interactive driver: a prompt goes in, Jev picks
+controls in the window you pointed it at, code does the clicking. The decision
+layer is the same one the mock tests and the YouTube run used.
+
+```bash
+.venv/Scripts/python.exe agentic_test_env/agent_run.py --list      # see windows
+.venv/Scripts/python.exe agentic_test_env/agent_run.py             # REPL
+
+> windows                      list visible top-level windows
+> target 4                     choose by number (or by exact title)
+> turn on word wrap            a task for the current target
+> dry on                       decide without acting
+> steps 10                     raise the per-prompt action budget
+> budget                       calls and cost so far
+```
+
+Non-interactive form, for scripting a single task:
+
+```bash
+.venv/Scripts/python.exe agentic_test_env/agent_run.py \
+    --target "Untitled - Notepad" --once "turn on word wrap"
+```
+
+### What changed once the target was real software
+
+**Identity is the window handle, not the title.** Real applications rewrite
+titles constantly — an editor marks a file dirty, a browser retitles on every
+navigation. A title-based allowlist either stops matching the window it was meant
+to protect or starts matching a different one. Handles do not move.
+
+**The agent cannot target what is running it.** The launching console, every
+window belonging to that console's process, and this process's own windows are
+refused, plus a denylist covering editors, Task Manager, Registry Editor and
+Windows Security. An agent whose first plausible action is closing its own
+terminal is a very short experiment. `--allow-protected` exists and is off.
+
+**Keystrokes require the target to be in front.** `SetValue` through the UIA value
+pattern is preferred because it is addressed to the element. When a control has no
+value pattern the fallback is `SendKeys`, which goes wherever focus is — so it
+refuses unless the target window is verifiably the foreground window first.
+
+**An ambiguous target is refused, not guessed.** `--target "Jev Agent Test Env"`
+substring-matched two windows on the first run — the mock app *and* its decoy
+dialog. Two windows when one was meant is the ordinary way an agent acts somewhere
+nobody intended, so an exact title wins outright, and an ambiguous substring lists
+the candidates and waits. `target all <text>` drives several deliberately.
+
+**An unanswerable confirmation is a no.** `sys.stdin.isatty()` is not enough:
+under a pipe it can report a terminal and then hand `input()` an immediate EOF,
+which crashed a run mid-task. Consequential actions now decline when there is
+nothing to answer with.
+
+### Two more noun-versus-verb bugs in the risk tiers
+
+Same root cause as `Start Send Report`, found twice more once real labels arrived:
+
+- **`Save Report` was tiered consequential**, because `report` had been added for
+  the web ("report a post") and matched the *noun* in a document name. A plain
+  save asked for permission.
+- **`Order history` was tiered consequential** and **`Place order` was not** —
+  exactly backwards.
+
+Unambiguous verbs (`send`, `pay`, `subscribe`, `buy now`, `place order`) now match
+anywhere; words that double as nouns (`report`, `share`, `order`, `archive`,
+`join`) only count when they lead the label; and a label *ending* in `history`,
+`log`, `settings`, `folder` or `inbox` is naming a place rather than an action.
+
+Worth stating plainly: **keyword tiering is a heuristic and it misfires in both
+directions.** Three separate bugs in it so far, all found by running against real
+labels rather than by reading the list. It is good enough to gate a test bed and
+it is the wrong shape for anything load-bearing. The better version asks Jev to
+judge the specific chosen control's reversibility — one extra call at $0.00004,
+spent only when the keyword pre-filter says an action might be more than
+navigation. That is not built yet.
+
+### Verified against the mock app
+
+```
+> target Jev Agent Test Env
+  target: 'Jev Agent Test Env'  (hwnd 2819894)
+> Save the report.
+   step 1: 11 controls (21 nodes, 53.1 ms) -> '2' p=1.00 present=0.97 done=0.03
+      -> Save Report (button)  [reversible]
+      click via invoke
+   step 2: 11 controls (21 nodes, 52.8 ms) -> 'none' p=0.99 present=0.18 done=0.85
+      done: task_complete 0.85
+```
+
+Untested against anything but the mock app and YouTube. Pointing it at real
+software is the next thing, and `dry on` is the way to start.
+
 ## Where this goes next
 
 The numbering approach is not the bottleneck, so the open questions have moved:

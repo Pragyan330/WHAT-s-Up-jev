@@ -1,0 +1,3 @@
+# Holds window titles and OCR text captured from whatever was on screen at the
+# time. Regenerate it locally with compare.py; the findings live in README.md.
+results.json
