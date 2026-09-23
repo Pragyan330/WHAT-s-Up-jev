@@ -117,9 +117,91 @@ available and then fail at kernel launch or silently JIT from PTX.
   that carries real identity, current state, and an Invoke addressed to the
   element rather than a click at a coordinate.
 
+## The merged pipeline
+
+`agentic_test_env/detect_scrape.py` puts the sources in order: every UIA control,
+then detected regions UIA has nothing for, each named from the OCR text inside it,
+dropping the ones that still have no name. `merged.py` measures it.
+
+Two numbers have to be good at the same time, and the OCR attempt only ever
+managed the first: is the needed control in the list, and is the list short
+enough for a distribution to mean anything?
+
+**The Start menu, searching for "Paint"** — the case that had blocked every
+attempt, because its results exist only in pixels:
+
+| | |
+| --- | --- |
+| UIA controls | **5**, none containing "Paint" |
+| Detector | 30 boxes, 29 novel, 13 labelled, 16 dropped unlabelled |
+| **Options offered** | **18** |
+| **"Paint" present** | **yes, via the detector** |
+
+Against the alternatives on the same screen:
+
+| Approach | Options | Target present? |
+| --- | --- | --- |
+| UIA alone | 5 | **no** |
+| OCR merged | 163 | yes, but the correct pick fell to 0.35 |
+| **Detector merged** | **18** | **yes** |
+
+Short list and the right target in it. On Calculator the same pipeline adds 3
+options to 33, which is the correct null result — UIA already describes that
+window.
+
+## End to end, in the agent
+
+With `--detect`, `agent_run.py` opens an application that was not running:
+
+```
+"Open Paint."
+  no open window matches (is_open=0.04)  ->  Start menu fallback
+  step 1  Search box (UIA)             p=0.91  ->  typed 'Paint'
+  step 2  Paint (detected element)     p=0.91  ->  clicked by position
+          followed new window: 'Untitled - Paint'
+  step 3  126 controls from Paint      done=0.96  ->  stopped, complete
+  11.77s = 2275 ms Jev (3 calls) + 806 ms scrape + 8693 ms app/waits
+```
+
+Verified from the running process, not the agent's own report: `mspaint` was up.
+Cost about $0.0004.
+
+Getting step 3 right took a fix worth recording. `settle()` returned as soon as
+the control set changed, and clicking a Start-menu result changes it instantly
+because the shell closes - so the agent scraped a dying shell, found nothing to
+do, and stopped without ever seeing it had succeeded. A new top-level window now
+counts as the screen settling, and the agent waits for one when a window it was
+driving disappears.
+
+That fix then over-corrected: waiting for a window on *every* change cost 1.2 s a
+step and turned a 13 s Calculator run into 23 s, waiting for something that was
+never coming. Scoping it to "a window we were driving vanished" - which is
+precisely the launch signal - brought it back to 13.06 s.
+
+## Dilution, caught on a real application
+
+Calculator relaunched in Scientific mode during a regression run, and the same
+task failed at the same step:
+
+| Calculator mode | Controls | p on the next digit |
+| --- | --- | --- |
+| Standard | 33 | **0.61** |
+| Scientific | 49 | **0.49** |
+
+Sixteen extra buttons cost roughly 0.12 of probability on an unrelated pick, and
+dropped it below the act threshold. Nothing about picking a digit got harder; the
+list got longer. That is the same effect that made OCR unusable at 163 options,
+now visible at 49 - and the argument for selecting a region first and a control
+within it, rather than offering one flat list.
+
 ## Next
 
-Merge the two sources — UIA first, detector boxes only for regions UIA has
-nothing for, OCR each of those for a label, dedupe geometrically — then measure
-the thing that actually decides it: on Chrome and the Start menu, is the correct
-target in the option list, and how long is that list?
+Two-stage selection: pick a region, then a control inside it. The detector's boxes
+give the geometry to cluster regions without another model, and it attacks the
+dilution directly instead of working around it.
+
+The labelling loss is the other open question. Sixteen of twenty-nine novel
+regions on the Start menu had no text inside them and were discarded. It worked
+because the survivors included the right one, which will not always hold. Icon
+captions sit below their box rather than inside it, so the box is now extended
+downward before a region is given up on.

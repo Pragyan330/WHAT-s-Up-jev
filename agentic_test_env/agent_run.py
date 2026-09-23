@@ -40,12 +40,23 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 
+# Window titles contain characters a cp1252 console cannot encode - a Visual
+# Studio Code title here carries a zero-width space - and printing one raises
+# UnicodeEncodeError, which would kill a run for the sake of a log line.
+for _stream in (sys.stdout, sys.stderr):
+    try:
+        _stream.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
+
 import uiautomation as auto
 
 import risk
 from agent import NONE_KEY, BudgetExceeded, BudgetGuard, decide, pick_window
 from typesafe_sdk import TypeSafeClient
 from keyboard import KeyControl, key_controls
+from detect_scrape import DetectedControl, load_detector
+from detect_scrape import merge as detect_merge, scrape as detect_scrape
 from ocr_scrape import OcrControl, merge as ocr_merge, read_window
 from uia_scrape import Element, list_top_level, scrape_hwnds
 
@@ -539,7 +550,7 @@ class Session:
         auto.SendKeys(key.sequence, waitTime=0)
         return {"via": "sendkeys", "keys": key.sequence}
 
-    def click_point(self, element: OcrControl) -> dict:
+    def click_point(self, element) -> dict:
         """Click an OCR line by position, after proving the point is ours.
 
         Two checks, because a coordinate is not an identity. The point has to sit
@@ -571,10 +582,23 @@ class Session:
         auto.Click(x, y, waitTime=0)
         return {"via": "ocr_click", "at": (x, y)}
 
+    def ask_text(self, element) -> str | None:
+        """Ask what to type. Returns None when there is nobody to ask."""
+        try:
+            if not sys.stdin.isatty():
+                raise EOFError
+            answer = input(f"      text for {element.label!r} "
+                           f"(blank to skip): ")
+        except (EOFError, KeyboardInterrupt):
+            print()
+            return None
+        answer = answer.strip()
+        return answer or None
+
     def act(self, element, value: str | None) -> dict:
         if isinstance(element, KeyControl):
             return self.press(element)
-        if isinstance(element, OcrControl):
+        if isinstance(element, (OcrControl, DetectedControl)):
             return self.click_point(element)
 
         # Provenance first: this element came out of a scrape of a target window,
@@ -719,6 +743,30 @@ class Session:
         # and state, OCR only gives text and a position. It runs when asked for,
         # or automatically when a window yields so few controls that the tree is
         # clearly not describing what is on screen.
+        if self.args.detect:
+            added = 0
+            for w in present.values():
+                if w["hwnd"] not in self.targets:
+                    continue
+                try:
+                    found, dstats = detect_scrape(w["hwnd"], w["title"],
+                                                  w["rect"], elements,
+                                                  device=self.args.detect_device)
+                except Exception as exc:
+                    print(f"      detector failed on {w['title'][:26]!r}: "
+                          f"{type(exc).__name__}: {exc}")
+                    continue
+                if found:
+                    elements = detect_merge(elements, found)
+                    added += len(found)
+                stats["detect_ms"] = (stats.get("detect_ms", 0.0)
+                                      + dstats["detect_ms"])
+                stats["detect_dropped"] = (stats.get("detect_dropped", 0)
+                                           + dstats["unlabelled"])
+            if added:
+                stats["detect_added"] = added
+                stats["kept"] = len(elements)
+
         want_ocr = self.args.ocr or (self.args.ocr_auto
                                      and stats.get("kept", 0) < self.args.ocr_below)
         if want_ocr:
@@ -757,11 +805,21 @@ class Session:
         return elements, stats
 
     @staticmethod
-    def _sig(elements: list[Element]) -> tuple:
-        return tuple(sorted((e.label, e.window) for e in elements))
+    def _sig(elements: list[Element], stats: dict | None = None) -> tuple:
+        """What counts as the screen having changed.
 
-    def settle(self, before: tuple, timeout: float = 0.9
-               ) -> tuple[list[Element], dict]:
+        Control labels alone are not enough. Pressing a digit in Calculator
+        leaves every label exactly as it was and only moves the display, so a
+        signature built from labels looks identical and the wait runs its full
+        length on every step. The window's readable text is the part that moved,
+        so it belongs in the signature.
+        """
+        labels = tuple(sorted((e.label, e.window) for e in elements))
+        texts = tuple((stats or {}).get("texts", ()))
+        return (labels, texts)
+
+    def settle(self, before: tuple, before_windows: set[int] | None = None,
+               timeout: float = 2.5) -> tuple[list[Element], dict]:
         """Wait for the screen to actually change, then hand back that scrape.
 
         Replaces a fixed sleep. A blind wait is either too short - the agent reads
@@ -770,10 +828,36 @@ class Session:
         the next step's input rather than being thrown away.
         """
         deadline = time.perf_counter() + timeout
+        # Losing a target is the signal that something was launched: clicking a
+        # Start-menu result closes the shell we were driving. Waiting for a new
+        # window on *every* change instead cost 1.2s a step and turned a 13s
+        # Calculator run into a 23s one, for a window that was never coming.
+        before_targets = set(self.targets)
         result = self.scrape_targets()
         while time.perf_counter() < deadline and not self.stop.stopped:
-            if self._sig(result[0]) != before:
-                return result
+            # A new top-level window counts as the screen settling, not just a
+            # change in the control list. Launching an application is the case
+            # that matters: clicking "Paint" in the Start menu closes the shell
+            # immediately, so the control set changes at once and the old wait
+            # returned before Paint existed. The agent then scraped the dying
+            # shell, found nothing to do, and stopped without ever seeing that
+            # it had succeeded.
+            if before_windows is not None:
+                now = {w["hwnd"] for w in self.windows()}
+                if now - before_windows:
+                    return self.scrape_targets()
+            if self._sig(result[0], result[1]) != before:
+                # Something changed, but give a launch a moment to produce a
+                # window before accepting this as the final state.
+                lost_a_target = bool(before_targets - set(self.targets))
+                if before_windows is None or not lost_a_target:
+                    return result
+                grace = time.perf_counter() + 1.5
+                while time.perf_counter() < grace and not self.stop.stopped:
+                    if {w["hwnd"] for w in self.windows()} - before_windows:
+                        return self.scrape_targets()
+                    time.sleep(0.1)
+                return self.scrape_targets()
             time.sleep(0.08)
             result = self.scrape_targets()
         return result
@@ -849,12 +933,29 @@ class Session:
         log("task_start", prompt=prompt, targets=list(self.targets))
 
         pending: tuple[list[Element], dict] | None = None
+        # With 15 steps instead of 6 there is room to wander. Repeat detection
+        # catches picking the same control twice; this catches the other shape,
+        # where the agent keeps choosing different controls and nothing on screen
+        # ever changes. Three of those and the loop is going nowhere, whatever it
+        # thinks it is doing.
+        stalled = 0
+        last_screen: tuple | None = None
 
         for step in range(1, self.args.max_steps + 1):
             # The scrape the previous step already waited for is reused here
             # rather than taken again; settling and looking are the same act.
             elements, stats = pending if pending else self.scrape_targets()
             pending = None
+            before_sig = self._sig(elements, stats)
+            if last_screen is not None and before_sig == last_screen:
+                stalled += 1
+                if stalled >= 3:
+                    print("      stopping: three actions and the screen has "
+                          "not changed at all")
+                    break
+            else:
+                stalled = 0
+            last_screen = before_sig
 
             if not self.targets:
                 print("      all target windows are gone; stopping")
@@ -944,6 +1045,17 @@ class Session:
                 break
 
             value = d.text_to_type if d.target.kind == "type" else None
+            if d.target.kind == "type" and not value:
+                # Jev returns judgements, not text, so it can pick the field but
+                # never invent what goes in it. Code extracts candidates from the
+                # request; when the request contains none, the person at the
+                # terminal is the only source left.
+                value = self.ask_text(d.target)
+                if value is None:
+                    print("      skipped: nothing to type")
+                    rec["outcome"] = "no_text"
+                    steps.append(rec)
+                    break
             if self.args.dry_run:
                 print(f"      would {d.target.kind}"
                       + (f" {value!r}" if value else ""))
@@ -979,7 +1091,8 @@ class Session:
                 controls=stats["kept"], nodes=stats["walked"],
                 in_tokens=d.in_tokens, out_tokens=d.out_tokens)
             history.append(f"{d.target.kind} on {d.target.label!r}")
-            pending = self.settle(self._sig(elements))
+            pending = self.settle(before_sig,
+                                  {w["hwnd"] for w in self.windows()})
 
         log("task_end", prompt=prompt, outcome="stopped", steps=len(steps),
             **_timing(steps, t_task))
@@ -1000,6 +1113,9 @@ HELP = """  commands:
     explain            the probability distribution behind the last decision
     steps <n>          max actions per prompt (now: {steps})
     dry on|off         decide without acting (now: {dry})
+    detect on|off      also offer detected on-screen elements, for windows
+                       whose accessibility tree does not describe them
+                       (browser pages, Start-menu results) (now: {detect})
     budget             show call usage
     help               this
     quit               exit
@@ -1011,13 +1127,18 @@ def main() -> None:
     ap.add_argument("--target", help="window title substring to drive")
     ap.add_argument("--once", help="run a single prompt and exit")
     ap.add_argument("--list", action="store_true", help="list windows and exit")
-    ap.add_argument("--max-steps", type=int, default=6)
+    ap.add_argument("--max-steps", type=int, default=15,
+                    help="actions per task. Raised from 6 because real "
+                         "tasks are longer than the mock ones: opening an "
+                         "application through the shell costs three")
     ap.add_argument("--depth", type=int, default=14,
                     help="how deep to walk each window's control tree. Real apps "
                          "nest far deeper than the old default of 6: the Windows "
                          "Search window yields 26 controls at depth 6 and 42 at "
                          "depth 20, so controls were being silently dropped")
-    ap.add_argument("--max-calls", type=int, default=30)
+    ap.add_argument("--max-calls", type=int, default=60,
+                    help="hard cap on Jev calls for this run. A longer "
+                         "horizon needs headroom; 60 calls is under a cent")
     ap.add_argument("--lifetime-cap", type=int, default=800)
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--yes", action="store_true",
@@ -1033,6 +1154,11 @@ def main() -> None:
                          "not just its dialogs and windows it opened")
     ap.add_argument("--no-chrome", action="store_true",
                     help="hide menu bars and window buttons from the model")
+    ap.add_argument("--detect", action="store_true",
+                    help="offer detected on-screen elements for the regions UIA "
+                         "has nothing for, labelled from OCR inside each box")
+    ap.add_argument("--detect-device", default="cuda",
+                    help="cuda or cpu; cpu costs 790 ms a window against 51 ms")
     ap.add_argument("--ocr", action="store_true",
                     help="always OCR the target windows and offer the text lines "
                          "as clickable options alongside the UIA controls")
@@ -1063,6 +1189,12 @@ def main() -> None:
         session.show_windows()
         return
 
+    if args.detect and args.once:
+        from PIL import Image
+        model, weights = load_detector(args.detect_device)
+        model.predict(Image.new("RGB", (640, 480)), verbose=False)
+        print(f"detector ready: {weights.name} on {args.detect_device}")
+
     if args.target:
         session.set_target(args.target)
     if args.once:
@@ -1075,6 +1207,12 @@ def main() -> None:
         finally:
             session.budget.flush()
         return
+
+    if args.detect:
+        from PIL import Image
+        model, weights = load_detector(args.detect_device)
+        model.predict(Image.new("RGB", (640, 480)), verbose=False)
+        print(f"detector ready: {weights.name} on {args.detect_device}")
 
     print("Jev computer control. Type a task, or 'help'.")
     print(f"  panic stop: hold {args.stop_key} at any time to halt mid-task.")
@@ -1094,7 +1232,8 @@ def main() -> None:
             break
         if low == "help":
             print(HELP.format(steps=args.max_steps,
-                              dry="on" if args.dry_run else "off"))
+                              dry="on" if args.dry_run else "off",
+                              detect="on" if args.detect else "off"))
         elif low == "windows":
             session.show_windows()
         elif low == "start":
@@ -1108,6 +1247,19 @@ def main() -> None:
         elif low.startswith("steps "):
             args.max_steps = max(1, int(line.split()[1]))
             print(f"  max steps per prompt: {args.max_steps}")
+        elif low.startswith("detect "):
+            on = low.split()[1] == "on"
+            if on and not args.detect:
+                from PIL import Image
+                model, weights = load_detector(args.detect_device)
+                # One real inference, because loading the weights is not the
+                # slow part - the first CUDA predict is, and paying it here
+                # keeps it out of the first step's timing.
+                model.predict(Image.new("RGB", (640, 480)), verbose=False)
+                print(f"  detector ready: {weights.name} on "
+                      f"{args.detect_device}")
+            args.detect = on
+            print(f"  detector: {'on' if on else 'off'}")
         elif low.startswith("dry "):
             args.dry_run = low.split()[1] == "on"
             print(f"  dry run: {'on' if args.dry_run else 'off'}")

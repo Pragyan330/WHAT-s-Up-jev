@@ -43,6 +43,21 @@ from dataclasses import dataclass
 
 from PIL import Image, ImageGrab
 
+# torch must load BEFORE winocr, and this is the only place that can guarantee
+# it, because winocr is imported here.
+#
+# Loading winocr first leaves torch unable to initialise: importing it afterwards
+# raises OSError [WinError 1114] on c10.dll, deterministically. Whatever WinRT
+# puts in the process upsets torch's DLL initialisation. It looked intermittent
+# at first only because the scripts that happened to import torch early worked
+# and the ones that imported OCR early did not.
+#
+# Guarded, because OCR is useful on machines with no torch installed at all.
+try:
+    import torch  # noqa: F401
+except Exception:
+    pass
+
 import winocr
 
 # --------------------------------------------------------------------------
